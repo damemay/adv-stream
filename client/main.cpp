@@ -25,11 +25,10 @@ SDL_Event event;
 int raw_pitch = 0;
 void* raw_pixels = NULL;
 int frame_pos = 0;
-int line_pos = 0;
 int foo = 1;
 int run = 1;
-int curl_run = 2;
 int line = 0;
+std::vector<cpr::AsyncWrapper<cpr::Response, true>> response;
 
 static void lock(SDL_Texture** texture, int* raw_pitch, void** raw_pixels) {
     if(!*raw_pixels) 
@@ -74,26 +73,36 @@ static size_t read_img(void* ptr, size_t size, size_t nmemb, void* stream) {
     return nbytes;
 }
 
-static void show_new_frame(const char* ptr, size_t size) {
+static int show_new_frame(const char* ptr, size_t size) {
     SDL_RWops* rwops = SDL_RWFromConstMem(ptr, size);
-    if(!rwops) puts("rwops"), exit(1);
+    if(!rwops) {
+        puts("rwops");
+        return 1;
+    }
+
     SDL_Surface* tmp = NULL;
     tmp = IMG_LoadJPG_RW(rwops);
-    if(!tmp) puts("loadjpg_rw"), exit(1);
+    if(!tmp) {
+        puts("loadjpg_rw");
+        return 1;
+    }
     SDL_Surface* image = NULL;
     image = SDL_ConvertSurfaceFormat(tmp, SDL_PIXELFORMAT_RGBA32, 0);
-    if(!image) puts("convertsurfaceformat"), exit(1);
+    if(!image) {
+        puts("convertsurfaceformat");
+        return 1;
+    }
     copy_buffer(&canvas, &raw_pitch, &raw_pixels, image->pixels);
     SDL_FreeSurface(tmp);
     SDL_FreeSurface(image);
     SDL_FreeRW(rwops);
     SDL_RenderCopy(renderer, canvas, NULL, NULL);
     SDL_RenderPresent(renderer);
+    return 0;
 }
 
 bool writeCallback(std::string data, intptr_t userdata) {
     size_t size = data.size();
-    
     memory* mem = (memory*)userdata;
 
     const char* pos = strstr(data.c_str(), "Content-Length: ");
@@ -117,7 +126,7 @@ bool writeCallback(std::string data, intptr_t userdata) {
     return true;
 }
 
-static nullptr_t parse_line(std::string line, memory* text, std::shared_ptr<cpr::Session> session) {
+static nullptr_t parse_line(std::string line, memory* text) {
     if(line.find("@src ") == std::string::npos) return nullptr;
     std::string uri = line.substr(5);
     auto url = cpr::Url{URL + uri};
@@ -125,13 +134,17 @@ static nullptr_t parse_line(std::string line, memory* text, std::shared_ptr<cpr:
         auto r = cpr::Get(url);
         show_new_frame(r.text.c_str(), r.text.size());
     } else {
-        puts("new anim");
-        session = nullptr;
-        session = std::make_shared<cpr::Session>();
-        session->SetUrl(url);
-        session->SetWriteCallback(cpr::WriteCallback{
-                writeCallback, (intptr_t)text});
-        session->GetAsync();
+        if(!response.empty()) {
+            if(response.at(0).wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout) {
+                (response.at(0).Cancel() == cpr::CancellationResult::success);
+                response.clear();
+                frame_pos = 0;
+                foo = 1;
+            }
+        }
+        response = MultiGetAsync(std::tuple{
+            url, cpr::WriteCallback{writeCallback, (intptr_t)text}
+        });
     }
     return nullptr;
 }
@@ -162,16 +175,14 @@ int main(int argc, char* argv[]) {
             512, 512))) return EXIT_FAILURE;
 
     memory image = {0};
-    memory text = {0};
 
-    std::shared_ptr<cpr::Session> session = std::make_shared<cpr::Session>();
-    parse_line(get_line(&line), &image, session);
+    parse_line(get_line(&line), &image);
 
     while(run) {
         while(SDL_PollEvent(&event) != 0) {
             if(event.type == SDL_QUIT) run = 0;
             if(event.type == SDL_KEYUP && event.key.repeat == 0)
-                if(event.key.keysym.sym == SDLK_RETURN) ++line, parse_line(get_line(&line), &image, session);
+                if(event.key.keysym.sym == SDLK_RETURN) ++line, parse_line(get_line(&line), &image);
         }
     }
 
