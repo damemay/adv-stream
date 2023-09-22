@@ -7,9 +7,6 @@
 #include <string.h>
 #include <string>
 
-#define IMAGE           0
-#define TEXT            1
-#define HANDLES         2
 #define MAX_BUFFER      5120
 #define URL             "http://192.168.1.26:8080"
 
@@ -56,42 +53,15 @@ static void copy_buffer(SDL_Texture** texture,
     unlock(texture, raw_pitch, raw_pixels);
 }
 
-static size_t read_line(void* ptr, size_t size, size_t nmemb, void* stream) {
-    memory* mem = (memory*)stream;
-    long nbytes = size*nmemb;
-    memcpy(&(mem->ptr[mem->size]), ptr, nbytes);
-    mem->size += nmemb;
-    puts(mem->ptr);
-    return nbytes;
-}
-
-static size_t read_img(void* ptr, size_t size, size_t nmemb, void* stream) {
-    memory* mem = (memory*)stream;
-    long nbytes = size*nmemb;
-    memcpy(&(mem->ptr[mem->size]), ptr, nbytes);
-    mem->size += nbytes;
-    return nbytes;
-}
-
 static int show_new_frame(const char* ptr, size_t size) {
     SDL_RWops* rwops = SDL_RWFromConstMem(ptr, size);
-    if(!rwops) {
-        puts("rwops");
-        return 1;
-    }
-
+    if(!rwops) return 1;
     SDL_Surface* tmp = NULL;
     tmp = IMG_LoadJPG_RW(rwops);
-    if(!tmp) {
-        puts("loadjpg_rw");
-        return 1;
-    }
+    if(!tmp) return 1;
     SDL_Surface* image = NULL;
     image = SDL_ConvertSurfaceFormat(tmp, SDL_PIXELFORMAT_RGBA32, 0);
-    if(!image) {
-        puts("convertsurfaceformat");
-        return 1;
-    }
+    if(!image) return 1;
     copy_buffer(&canvas, &raw_pitch, &raw_pixels, image->pixels);
     SDL_FreeSurface(tmp);
     SDL_FreeSurface(image);
@@ -182,7 +152,8 @@ int main(int argc, char* argv[]) {
         while(SDL_PollEvent(&event) != 0) {
             if(event.type == SDL_QUIT) run = 0;
             if(event.type == SDL_KEYUP && event.key.repeat == 0)
-                if(event.key.keysym.sym == SDLK_RETURN) ++line, parse_line(get_line(&line), &image);
+                if(event.key.keysym.sym == SDLK_RETURN)
+                    ++line, parse_line(get_line(&line), &image);
         }
     }
 
