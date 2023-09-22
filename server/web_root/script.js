@@ -4,7 +4,12 @@ let image = document.querySelector("img")
 
 window.addEventListener("load", (e) => {
     getLine(currentLine).then(function(result) {
-        textbox.innerText = result;
+        let should_skip = parseLine(result);
+        if(should_skip) {
+            nextLine(e);
+        } else {
+            textbox.innerText = result;
+        }
     });
 });
 
