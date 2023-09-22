@@ -1,2 +1,2 @@
 all:
-	gcc -lcurl -lSDL2 -lSDL2_image main.c -o client -g
+	g++ -lcurl -lcpr -lSDL2 -lSDL2_image main.cpp -o client -g
