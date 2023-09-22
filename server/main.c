@@ -52,8 +52,8 @@ static void cb(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
         c->fn_data = malloc(1000);
     } else if (ev == MG_EV_HTTP_MSG) {
         struct mg_http_message *hm = (struct mg_http_message *) ev_data;
-        if (mg_http_match_uri(hm, "/api/video1")) {
-            if(c->fn_data) strcpy(c->fn_data, "video1");
+        if (mg_http_match_uri(hm, "/grey")) {
+            if(c->fn_data) strcpy(c->fn_data, "grey");
             stream_print();
         } else if(mg_http_match_uri(hm, "/red")) {
             if(c->fn_data) strcpy(c->fn_data, "red");
@@ -97,8 +97,8 @@ static void broadcast_mjpeg_frame(struct mg_mgr *mgr) {
     struct mg_connection *c;
     for (c = mgr->conns; c != NULL; c = c->next) {
         if (c->data[0] != 'S') continue;         // Skip non-stream connections
-        if(strcmp(c->fn_data, "video1")==0) {
-            const char *files[] = {"images/1.jpg", "images/2.jpg", "images/3.jpg", "images/4.jpg", "images/5.jpg", "images/6.jpg"};
+        if(strcmp(c->fn_data, "grey")==0) {
+            const char *files[] = {GREY_CUBE};
             broadcast_work();
         } else if(strcmp(c->fn_data, "red")==0) {
             const char *files[] = {RED_CUBE};
